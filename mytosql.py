@@ -212,9 +212,11 @@ import numpy as np
 import pandas as pd
 
 dd = []
-for i in range(1, 15):
+for i in range(1, 4):
     data = np.random.randint(1, 20, 2)
     dd.append(data)
-df4 = pd.DataFrame(dd, columns=['ID', 'org'])
+df2 = pd.DataFrame(dd, columns=['ID', 'org'])
 
-up_to_sql("JYPRIME", "dbo", "mixZSSQB_BAK", engine, df, zhu=['ID', 'INBBM'])
+up_to_sql("JYPRIME", "dbo", "mixZSSQB_BAK", engine, df2, zhu=['ID', 'INBBM'])
+
+
