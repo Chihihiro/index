@@ -14,7 +14,7 @@ from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
 from pdfminer.converter import PDFPageAggregator
 from pdfminer.layout import *
 from pdfminer.pdfinterp import PDFTextExtractionNotAllowed
-
+import PyPDF2
 '''
 解析pdf文件，获取文件中包含的各种对象
 '''
@@ -23,6 +23,12 @@ from pdfminer.pdfinterp import PDFTextExtractionNotAllowed
 # 解析pdf文件函数
 def parse(pdf_path):
     fp = open(pdf_path, 'rb')  # 以二进制读模式打开
+
+
+
+    fp.rotateClockwise(90)
+    fp = fp
+
     # 用文件对象来创建一个pdf文档分析器
     parser = PDFParser(fp)
     # 创建一个PDF文档
@@ -77,8 +83,15 @@ def parse(pdf_path):
               %num_TextBoxHorizontal)
 
 
-pdf_path = r'E:\xml\ZG.pdf'
+pdf_path = r'C:/Users/qinxd/Desktop/LTN20181009345_C.pdf'
 parse(pdf_path)
+
+
+
+
+
+
+
 
 
 

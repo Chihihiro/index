@@ -80,7 +80,7 @@ def parse(_path):
                         f.close()
 
 def main():
-    path = r'C:/Users/qinxd/Desktop/资产证券化业务备案情况（2017年一季度）.pdf'
+    path = r'C:/Users/qinxd/Desktop/LTN20181009345_C.pdf'
     parse(path)
 
 
