@@ -1,8 +1,41 @@
+import os
+base_path = os.getcwd()
+print(base_path)
 import tabula
 import pandas as pd
 import re
-import os
 import subprocess
+import datetime
+
+
+class mv_file:
+    """
+    type_file : 'all' 是全部, 可以指定各种格式pdf,csv,xlsx
+    """
+
+    def __init__(self, old_path, new_path, type_file='all'):
+        self.old_path = old_path
+        self.new_path = new_path
+        self.files = []
+        self.type_file = type_file
+
+    def read_files(self):
+        if self.type_file == 'all':
+            self.files = os.listdir(self.old_path)
+        else:
+            files = os.listdir(self.old_path)
+            self.files = [i for i in files if i[-len(self.type_file):] == self.type_file]
+        return self.files
+
+    def move_files(self):
+        if not os.path.exists(self.new_path):
+            os.makedirs(self.new_path)  # 创建路径
+        files_list = self.read_files()
+        for i in files_list:
+            srcfile = self.old_path + '\\' + i
+            dstfile = self.new_path + '\\' + i
+            shutil.move(srcfile, dstfile)
+            print("move %s -> %s" % (srcfile, dstfile))
 
 
 def strQ2B(ustring):
@@ -18,87 +51,29 @@ def strQ2B(ustring):
         rstring = rstring + chr(inside_code)
     return rstring
 
+def now_time(a=0):
+    now = datetime.datetime.now()
+    delta = datetime.timedelta(days=a)
+    n_days = now + delta
+    print(n_days.strftime('%Y-%m-%d %H:%M:%S'))
+    f = n_days.strftime('%Y-%m-%d')
+    return f
 
-def get_w(t):
-    ll = ['增加/(減少)', '本月增加/(減少)']
-    w = []
-    for i in ll:
-        try:
-            v = t.index(i)
-            w.append(v)
-        except ValueError:
-            pass
-        else:
-            pass
-    return w
-
-
-def renum(x):
-    try:
-        num = float(re.sub(",", "", re.search('[0-9]*,?[0-9]', x).group()))
-
-    except AttributeError:
-        num = 0
-    else:
-        pass
-    return num
-
-
-def return_result(path):
-    # df = tabula.read_pdf(path, encoding='utf-8', pages=[1, 2, 3], lattice=bool)
-    try:
-        df = read_one_pdf(path)
-        print(df)
-        df2 = pd.DataFrame(df.columns, columns=['A'])
-        df.columns = ['A']
-        dff = df.append(df2).reset_index(drop=True)
-        dff['A'] = dff['A'].apply(lambda x: strQ2B(x) if type(x) is str else x)
-        dff["B"] = dff['A'].apply(lambda x: x.split())
-        dff["C"] = dff['B'].apply(lambda x: get_w(x))
-        dff["D"] = list(map(lambda x, y: y[x[0] + 1] if len(x) > 0 else '无', dff['C'], dff['B']))
-        dff["E"] = dff["D"].apply(lambda x: renum(x) if type(x) is str else 0)
-        print(dff)
-        su = dff["E"].sum()
-        print(su)
-        if su > 100:
-            a = '有数据请查看'
-            return a
-        else:
-            a = '无'
-            return a
-    except BaseException:
-        print('解析失败返回错误')
-        a = '解析失败请手动查看PDF'
-        return a
-
-
-def read_one_pdf(path):
-    try:
-        df = tabula.read_pdf(path, encoding='utf-8', pages=[1, 2, 3], lattice=bool)
-    except BaseException:
-        try:
-            print('第一次解析失败')
-            df = tabula.read_pdf(path, encoding='utf-8', pages=[1, 2], lattice=bool)
-        except BaseException:
-            try:
-                print('第二次解析失败')
-                df = tabula.read_pdf(path, encoding='utf-8', pages=[1], lattice=bool)
-            except BaseException:
-                print('无法解析')
-                d = {"增加/(減少)wu": "无"}
-                df = pd.DataFrame([d])
-            else:
-                pass
-        else:
-            pass
-    else:
-        pass
-    return df
 
 
 def one_page(path, pa):
     try:
         df1 = tabula.read_pdf(path, encoding='utf-8', pages=[pa], lattice=bool)
+        if df1.index.values[0] == 0:
+            pass
+        else:
+            cc = df1.columns[0]
+            t = df1.reset_index(drop=False)['index']
+            d = pd.DataFrame(t)
+
+            d.columns = [cc]
+            df1 = d
+
     except subprocess.CalledProcessError:
         print('超过页数')
         d = {"A": '增加/(減少)超过页数本月底结存'}
@@ -183,11 +158,13 @@ def read_pdf_all(path):
     dff['txt'] = dff['B'].apply(lambda x: "".join(x))
     dff['clean'] = dff['txt'].apply(lambda x: clean_txt(x))
     dff['包含的数字'] = dff['clean'].apply(lambda x: only_num(x))
+    dff['特殊'] = dff['clean'].apply(lambda x: 11 if type(x) is str and '增加減少' in x else 0)
     y = "".join(dff['clean'].values.tolist())
+
     if y == '':
         y = '解析为空请查看一下'
 
-    su = dff['包含的数字'].sum()
+    su = dff['包含的数字'].sum() + dff['特殊'].sum()
     if su > 10:
         a = '有数据请查看'
         return [a, y]
@@ -201,14 +178,14 @@ def main():
 
     :path: 读取文件夹的路径
     """
-    # path = 'C:/Users/qinxd/Desktop/10-4'
+    # path = 'C:/Users/qinxd/Desktop/10-4/w/'
     # path = 'C:/Users/qinxd/Desktop/有问题的pdf'
     p = os.getcwd()
     pp = p + '\\pdfs\\'
     files = os.listdir(pp)
     pdfs = []
     for i in files:
-        if '.pdf' in i:
+        if i[-3:] == 'pdf':
             pdfs.append(i)
         else:
             pass
@@ -221,19 +198,54 @@ def main():
         f = [pdf, w[0], w[1]]
         result.append(f)
 
-    p = os.getcwd()
-    pp = p + '\\pdfs\\'
+    # p = os.getcwd()
+    # pp = p + '\\pdfs\\'
     dataframe = pd.DataFrame(result, columns=['PDF名字', '解析结果', '内容和状况'])
     dataframe['解析不出的'] = dataframe['内容和状况'].apply(lambda x: '解析失败,或者有图片' if '解析' in x else 'pass')
     dataframe.to_csv(pp + '\\pdf解析.csv', encoding='utf_8_sig')
 
 
 if __name__ == '__main__':
-    PATH = os.getcwd()+'\\pdfs\\'
+    PATH = os.getcwd()+'\\被解析过的pdfs\\'
     if not os.path.isdir(PATH):
         os.mkdir(PATH)
     main()
 
+    floderaddress = os.getcwd()+'\\pdfs\\'
+    file_all = os.listdir(floderaddress)  # 路径下所有文件名
+
+    import shutil
+
+
+
+a = mv_file(floderaddress, PATH, type_file='pdf')
+
+
+# path = 'C:/Users/qinxd/Desktop/10-4/01686-新意網集團-月報表截至2018年9月30日止股份發行人的證券變動月報表 (234KB, PDF).pdf'
+#
+#
+# import sys
+# import os
+# base_path = os.path.dirname(os.path.abspath(__file__))
+# base_path = os.path.dirname(os.path.abspath(tabula.__file__))
+# if getattr(sys, 'frozen', False):
+#     base_path = sys._MEIPASS ## 表示在实际生产运行时让程序去此目录查找
+# if not base_path in sys.path:
+#     sys.path.append(base_path)
+class Employee:
+    '所有员工的基类'
+    empCount = 0
+
+    def __init__(self, name, salary):
+        self.name = name
+        self.salary = salary
+        Employee.empCount += 1
+
+    def displayCount(self):
+        print("Total Employee %d" % Employee.empCount)
+
+    def displayEmployee(self):
+        print("Name : ", self.name, ", Salary: ", self.salary)
 
 
 
