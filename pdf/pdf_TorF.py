@@ -1,11 +1,10 @@
 import os
-base_path = os.getcwd()
-print(base_path)
 import tabula
 import pandas as pd
 import re
 import subprocess
 import datetime
+import shutil
 
 
 class mv_file:
@@ -51,6 +50,7 @@ def strQ2B(ustring):
         rstring = rstring + chr(inside_code)
     return rstring
 
+
 def now_time(a=0):
     now = datetime.datetime.now()
     delta = datetime.timedelta(days=a)
@@ -58,7 +58,6 @@ def now_time(a=0):
     print(n_days.strftime('%Y-%m-%d %H:%M:%S'))
     f = n_days.strftime('%Y-%m-%d')
     return f
-
 
 
 def one_page(path, pa):
@@ -85,8 +84,10 @@ def one_page(path, pa):
         df1 = pd.DataFrame([d])
     return df1
 
-def read_3_page(path, pa):
 
+
+
+def read_3_page(path, pa):
     df1 = one_page(path, pa)
 
     if type(df1) is pd.DataFrame:
@@ -123,6 +124,7 @@ def clean_txt(x):
         pass
     return num
 
+
 def only_num(x):
     try:
         # num = float(re.search('[0-9]*,?[0-9]', x).group())
@@ -133,6 +135,7 @@ def only_num(x):
     else:
         pass
     return num
+
 
 def read_pdf_all(path):
     # df1 = read_3_page(path, 1)
@@ -206,46 +209,19 @@ def main():
 
 
 if __name__ == '__main__':
-    PATH = os.getcwd()+'\\被解析过的pdfs\\'
+    base_path = os.getcwd()
+    print(base_path)
+    PATH = os.getcwd() + '\\被解析过的pdfs\\'
     if not os.path.isdir(PATH):
         os.mkdir(PATH)
     main()
 
-    floderaddress = os.getcwd()+'\\pdfs\\'
+    floderaddress = os.getcwd() + '\\pdfs\\'
     file_all = os.listdir(floderaddress)  # 路径下所有文件名
-
-    import shutil
-
-
-
-a = mv_file(floderaddress, PATH, type_file='pdf')
-
-
-# path = 'C:/Users/qinxd/Desktop/10-4/01686-新意網集團-月報表截至2018年9月30日止股份發行人的證券變動月報表 (234KB, PDF).pdf'
-#
-#
-# import sys
-# import os
-# base_path = os.path.dirname(os.path.abspath(__file__))
-# base_path = os.path.dirname(os.path.abspath(tabula.__file__))
-# if getattr(sys, 'frozen', False):
-#     base_path = sys._MEIPASS ## 表示在实际生产运行时让程序去此目录查找
-# if not base_path in sys.path:
-#     sys.path.append(base_path)
-class Employee:
-    '所有员工的基类'
-    empCount = 0
-
-    def __init__(self, name, salary):
-        self.name = name
-        self.salary = salary
-        Employee.empCount += 1
-
-    def displayCount(self):
-        print("Total Employee %d" % Employee.empCount)
-
-    def displayEmployee(self):
-        print("Name : ", self.name, ", Salary: ", self.salary)
-
-
+    strtime = now_time()
+    new_path = PATH + strtime + '\\'
+    if not os.path.isdir(new_path):
+        os.mkdir(new_path)
+    a = mv_file(floderaddress, new_path, type_file='pdf')
+    a.move_files()
 

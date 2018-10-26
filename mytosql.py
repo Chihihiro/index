@@ -193,23 +193,23 @@ def up_to_sql(DD, usr, tb_name, co, dataframe, zhu):
             print("注意有错误~~~~~~~~~~~有错误~~~~~~~~~~~")
 
 
-import pandas as pd
 
-engine = pymssql.connect(host="10.1.5.121", user="dmp", password="123456", database="JYPRIME")
+#
+# engine = pymssql.connect(host="10.1.5.121", user="dmp", password="123456", database="JYPRIME")
+#
+# sql = 'SELECT * FROM [dbo].[cmdCONVDEF1]  where XBM = 5'
+#
+# dataframe = pd.read_sql(sql, engine)
+# import numpy as np
+# import pandas as pd
+# dataframe["XBM"] = np.random.randint(12, 2)
+#
+# # to_sql("JYPRIME", "dbo", "cmdCONVDEF1", engine, dataframe, type="update")
+# up_to_sql("JYPRIME", "dbo", "cmdCONVDEF1", engine, dataframe, zhu=['XBM'])
 
-sql = 'SELECT * FROM [dbo].[cmdCONVDEF1]  where XBM = 5'
-
-dataframe = pd.read_sql(sql, engine)
-import numpy as np
-import pandas as pd
-dataframe["XBM"] = np.random.randint(12, 2)
-
-# to_sql("JYPRIME", "dbo", "cmdCONVDEF1", engine, dataframe, type="update")
-up_to_sql("JYPRIME", "dbo", "cmdCONVDEF1", engine, dataframe, zhu=['XBM'])
 
 
-import numpy as np
-import pandas as pd
+
 
 dd = []
 for i in range(1, 4):

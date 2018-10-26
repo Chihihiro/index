@@ -6,7 +6,12 @@ import os
 import subprocess
 import datetime
 import shutil
+import smtplib
 from win32com import client
+from email.header import Header
+from email.mime.text import MIMEText
+from email.utils import parseaddr, formataddr
+from email.mime.multipart import MIMEMultipart
 
 
 class mv_file:
@@ -37,6 +42,46 @@ class mv_file:
             dstfile = self.new_path + '\\' + i
             shutil.move(srcfile, dstfile)
             print("move %s -> %s" % (srcfile, dstfile))
+
+
+class to_email:
+
+    def __init__(self, to_addre):
+        self.to_addre = to_addre
+
+    def format_addr(self, s):
+        name, addr = parseaddr(s)
+        return formataddr((Header(name, 'utf-8').encode(), addr))
+
+    def course(self):
+        # 输入Email地址和口令:
+        from_addr = '632207812@qq.com'
+        password = 'aphstjyszatqbecc'
+        # 输入收件人地址:
+        # to_addr = '632207812@qq.com'
+        # 输入SMTP服务器地址:
+        smtp_server = 'smtp.qq.com'
+        msg = MIMEMultipart()
+        msg.attach(MIMEText('pdf解析完成请查收', 'plain', 'utf-8'))
+        # msg = MIMEText('hello, send by Python...', 'plain', 'utf-8')#正文
+        msg['From'] = self.format_addr('秦晓东 <%s>' % from_addr)  # 发件人 不该就成为邮箱地址
+        msg['To'] = self.format_addr('收件人 <%s>' % self.to_addre)  # 收件人
+        msg['Subject'] = Header('pdf解析的报告', 'utf-8').encode()  # 标题
+
+        path = os.getcwd()
+        a = mv_file(old_path=path, new_path=path, type_file='.csv')
+        b = a.read_files()
+
+        lu = path + '\\' + b[0]
+        att1 = MIMEText(open(lu, 'rb').read(), 'base64', 'utf-8')
+        att1["Content-Type"] = 'application/octet-stream'
+        att1["Content-Disposition"] = 'attachment; filename="{}"'.format(b[0])
+        msg.attach(att1)
+        server = smtplib.SMTP(smtp_server, 25)
+        server.set_debuglevel(1)
+        server.login(from_addr, password)
+        server.sendmail(from_addr, [self.to_addre], msg.as_string())
+        server.quit()
 
 
 def now_time(a=0):
@@ -277,7 +322,57 @@ def main():
         os.mkdir(new_path)
     a = mv_file(pdfaddress, new_path, type_file='all')
     a.move_files()
+    """
+    传入邮箱
+    """
+    e = to_email('632207812@qq.com')
+    e.course()
 
 
 if __name__ == '__main__':
     main()
+
+
+
+
+class to_email:
+
+    def __init__(self, to_addre):
+        self.to_addre = to_addre
+
+    @classmethod
+    def format_addr(self, s):
+        name, addr = parseaddr(s)
+        return formataddr((Header(name, 'utf-8').encode(), addr))
+
+    def course(self):
+        # 输入Email地址和口令:
+        from_addr = '632207812@qq.com'
+        password = 'aphstjyszatqbecc'
+        # 输入收件人地址:
+        # to_addr = '632207812@qq.com'
+        # 输入SMTP服务器地址:
+        smtp_server = 'smtp.qq.com'
+        msg = MIMEMultipart()
+        msg.attach(MIMEText('pdf解析完成请查收', 'plain', 'utf-8'))
+        # msg = MIMEText('hello, send by Python...', 'plain', 'utf-8')#正文
+        msg['From'] = self.format_addr('秦晓东 <%s>' % from_addr)  # 发件人 不该就成为邮箱地址
+        msg['To'] = self.format_addr('收件人 <%s>' % self.to_addre)  # 收件人
+        msg['Subject'] = Header('pdf解析的报告', 'utf-8').encode()  # 标题
+
+        path = os.getcwd()
+        a = mv_file(old_path=path, new_path=path, type_file='.csv')
+        b = a.read_files()
+
+        lu = path + '\\' + b[0]
+        att1 = MIMEText(open(lu, 'rb').read(), 'base64', 'utf-8')
+        att1["Content-Type"] = 'application/octet-stream'
+        att1["Content-Disposition"] = 'attachment; filename="{}"'.format(b[0])
+        msg.attach(att1)
+        server = smtplib.SMTP(smtp_server, 25)
+        server.set_debuglevel(1)
+        server.login(from_addr, password)
+        server.sendmail(from_addr, [self.to_addre], msg.as_string())
+        server.quit()
+
+

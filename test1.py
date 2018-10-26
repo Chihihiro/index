@@ -28,3 +28,4 @@ if __name__ == '__main__':
     # doc_name = "f:/test.doc"
     # ftp_name = "f:/test.pdf"
     doc2pdf(doc_name, ftp_name)
+
