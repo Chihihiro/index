@@ -1,17 +1,22 @@
 # -*- coding: utf-8 -*-
 import tabula
+import sys
 import pandas as pd
 import re
 import os
+import pymysql
+import time
 import subprocess
 import datetime
 import shutil
 import smtplib
+from sqlalchemy import create_engine
 from win32com import client
 from email.header import Header
 from email.mime.text import MIMEText
 from email.utils import parseaddr, formataddr
 from email.mime.multipart import MIMEMultipart
+
 
 
 class mv_file:
@@ -42,6 +47,17 @@ class mv_file:
             dstfile = self.new_path + '\\' + i
             shutil.move(srcfile, dstfile)
             print("move %s -> %s" % (srcfile, dstfile))
+
+    def copy_files(self):
+        if not os.path.exists(self.new_path):
+            os.makedirs(self.new_path)  # 创建路径
+        files_list = self.read_files()
+        for i in files_list:
+            srcfile = self.old_path + '\\' + i
+            dstfile = self.new_path + '\\' + i
+            shutil.copy(srcfile, dstfile)
+            print("copy %s -> %s" % (srcfile, dstfile))
+
 
 
 class to_email:
@@ -82,6 +98,113 @@ class to_email:
         server.login(from_addr, password)
         server.sendmail(from_addr, [self.to_addre], msg.as_string())
         server.quit()
+
+
+def sql_cols(df, usage="sql"):
+    cols = tuple(df.columns)
+    if usage == "sql":
+        cols_str = str(cols).replace("'", "`")
+        if len(df.columns) == 1:
+            cols_str = cols_str[:-2] + ")"  # to process dataframe with only one column
+        return cols_str
+    elif usage == "format":
+        base = "'%%(%s)s'" % cols[0]
+        for col in cols[1:]:
+            base += ", '%%(%s)s'" % col
+        return base
+    elif usage == "values":
+        base = "%s=VALUES(%s)" % (cols[0], cols[0])
+        for col in cols[1:]:
+            base += ", `%s`=VALUES(`%s`)" % (col, col)
+        return base
+
+engine = create_engine(
+    "mysql+pymysql://{}:{}@{}:{}/{}".format('root', 'chihiro123', '47.107.35.189', 3306, 'mysql', ),
+    connect_args={"charset": "utf8"}, echo=True, )
+
+def to_sql(tb_name, conn, dataframe, type="update", chunksize=2000, debug=False):
+    """
+    Dummy of pandas.to_sql, support "REPLACE INTO ..." and "INSERT ... ON DUPLICATE KEY UPDATE (keys) VALUES (values)"
+    SQL statement.
+
+    Args:
+        tb_name: str
+            Table to insert get_data;
+        conn:
+            DBAPI Instance
+        dataframe: pandas.DataFrame
+            Dataframe instance
+        type: str, optional {"update", "replace", "ignore"}, default "update"
+            Specified the way to update get_data. If "update", then `conn` will execute "INSERT ... ON DUPLICATE UPDATE ..."
+            SQL statement, else if "replace" chosen, then "REPLACE ..." SQL statement will be executed; else if "ignore" chosen,
+            then "INSERT IGNORE ..." will be excuted;
+        chunksize: int
+            Size of records to be inserted each time;
+        **kwargs:
+
+    Returns:
+        None
+    """
+
+    df = dataframe.copy(deep=False)
+    df = df.fillna("None")
+    df = df.applymap(lambda x: re.sub('([\'\"\\\])', '\\\\\g<1>', str(x)))
+    cols_str = sql_cols(df)
+    sqls = []
+    for i in range(0, len(df), chunksize):
+        # print("chunk-{no}, size-{size}".format(no=str(i/chunksize), size=chunksize))
+        df_tmp = df[i: i + chunksize]
+
+        if type == "replace":
+            sql_base = "REPLACE INTO `{tb_name}` {cols}".format(
+                tb_name=tb_name,
+                cols=cols_str
+            )
+
+        elif type == "update":
+            sql_base = "INSERT INTO `{tb_name}` {cols}".format(
+                tb_name=tb_name,
+                cols=cols_str
+            )
+            sql_update = "ON DUPLICATE KEY UPDATE {0}".format(
+                sql_cols(df_tmp, "values")
+            )
+
+        elif type == "ignore":
+            sql_base = "INSERT IGNORE INTO `{tb_name}` {cols}".format(
+                tb_name=tb_name,
+                cols=cols_str
+            )
+
+        sql_val = sql_cols(df_tmp, "format")
+        vals = tuple([sql_val % x for x in df_tmp.to_dict("records")])
+        sql_vals = "VALUES ({x})".format(x=vals[0])
+        for i in range(1, len(vals)):
+            sql_vals += ", ({x})".format(x=vals[i])
+        sql_vals = sql_vals.replace("'None'", "NULL")
+
+        sql_main = sql_base + sql_vals
+        if type == "update":
+            sql_main += sql_update
+
+        if sys.version_info.major == 2:
+            sql_main = sql_main.replace("u`", "`")
+        if sys.version_info.major == 3:
+            sql_main = sql_main.replace("%", "%%")
+
+        if debug is False:
+            try:
+                conn.execute(sql_main)
+            except pymysql.err.InternalError as e:
+                print("ENCOUNTERING ERROR: {e}, RETRYING".format(e=e))
+                time.sleep(10)
+                conn.execute(sql_main)
+        else:
+            sqls.append(sql_main)
+    if debug:
+        return sqls
+
+
 
 
 def now_time(a=0):
@@ -143,6 +266,7 @@ def one_page(path, pa):
 
 def read_3_page(path, pa):
     df1 = one_page(path, pa)
+    df1[df1.columns[0]] = df1[df1.columns[0]].apply(lambda x: str(x) if type(x) is int else x)
 
     if type(df1) is pd.DataFrame:
         conum = len(df1.columns)
@@ -255,8 +379,17 @@ def analysis():
     p = os.getcwd()
     pp = p + '\\pdfs\\'
     files = os.listdir(pp)
+    """
+    读取数据库里面已经解析的pdf
+    """
+    df = pd.read_sql("select pdf_name from pdf_match", engine)
+    pl = df['pdf_name'].values.tolist()
+    ma = [i for i in files if i not in pl]
+    data = pd.DataFrame(ma, columns=['pdf_name'])
+    to_sql('pdf_match', engine, data, type='update')
     pdfs = []
-    for i in files:
+
+    for i in ma:
         if '.pdf' in i:
             pdfs.append(i)
         else:
@@ -297,14 +430,27 @@ def all_doc2pdf(path):
 
 
 def main():
-    all_files = r'\dmp1\resource\pdf\港股其他 (月報表等)'
-    # all_files = r'C:\Users\qinxd\Desktop\all'
-    pdfaddress = os.getcwd() + '\\pdfs\\'
+    all_files = r'\\dmp1\resource\pdf\港股其他 (月報表等)'
+    lls = []
+    for dirpath, dirnames, filenames in os.walk(all_files):
+        for filename in filenames:
+            cc = dirpath + '\\'+filename
+            if cc[-4:] in ['.pdf', '.doc']:
+                lls.append(cc)
 
-    alls = mv_file(all_files, pdfaddress, type_file='all')
-    alls.move_files()
+    pdfaddress = os.getcwd() + '\\pdfs\\'
+    if not os.path.isdir(pdfaddress):
+        os.mkdir(pdfaddress)
+
+    for ll in lls:
+        shutil.copy(ll, pdfaddress)
+
+    """word转pdf"""
     all_doc2pdf(path=pdfaddress)
     print('doc 转 pdf 成功')
+    """
+    迁移存放pdf文件，存放旧的csv文件
+    """
     base_path = os.getcwd()
     PATH = os.getcwd() + '\\被解析过的pdfs\\'
     if not os.path.isdir(PATH):
@@ -316,6 +462,7 @@ def main():
     csv.move_files()
     analysis()
     print('解析PDF成功')
+
     strtime = now_time()
     new_path = PATH + strtime + '\\'
     if not os.path.isdir(new_path):
@@ -325,7 +472,8 @@ def main():
     """
     传入邮箱
     """
-    e = to_email('632207812@qq.com')
+    e = to_email('huangyc@hundsun.com')
+    # e = to_email('632207812@qq.com')
     e.course()
 
 
@@ -335,44 +483,5 @@ if __name__ == '__main__':
 
 
 
-class to_email:
-
-    def __init__(self, to_addre):
-        self.to_addre = to_addre
-
-    @classmethod
-    def format_addr(self, s):
-        name, addr = parseaddr(s)
-        return formataddr((Header(name, 'utf-8').encode(), addr))
-
-    def course(self):
-        # 输入Email地址和口令:
-        from_addr = '632207812@qq.com'
-        password = 'aphstjyszatqbecc'
-        # 输入收件人地址:
-        # to_addr = '632207812@qq.com'
-        # 输入SMTP服务器地址:
-        smtp_server = 'smtp.qq.com'
-        msg = MIMEMultipart()
-        msg.attach(MIMEText('pdf解析完成请查收', 'plain', 'utf-8'))
-        # msg = MIMEText('hello, send by Python...', 'plain', 'utf-8')#正文
-        msg['From'] = self.format_addr('秦晓东 <%s>' % from_addr)  # 发件人 不该就成为邮箱地址
-        msg['To'] = self.format_addr('收件人 <%s>' % self.to_addre)  # 收件人
-        msg['Subject'] = Header('pdf解析的报告', 'utf-8').encode()  # 标题
-
-        path = os.getcwd()
-        a = mv_file(old_path=path, new_path=path, type_file='.csv')
-        b = a.read_files()
-
-        lu = path + '\\' + b[0]
-        att1 = MIMEText(open(lu, 'rb').read(), 'base64', 'utf-8')
-        att1["Content-Type"] = 'application/octet-stream'
-        att1["Content-Disposition"] = 'attachment; filename="{}"'.format(b[0])
-        msg.attach(att1)
-        server = smtplib.SMTP(smtp_server, 25)
-        server.set_debuglevel(1)
-        server.login(from_addr, password)
-        server.sendmail(from_addr, [self.to_addre], msg.as_string())
-        server.quit()
 
 
