@@ -80,7 +80,7 @@ class to_email:
         msg = MIMEMultipart()
         msg.attach(MIMEText('pdf解析完成请查收', 'plain', 'utf-8'))
         # msg = MIMEText('hello, send by Python...', 'plain', 'utf-8')#正文
-        msg['From'] = self.format_addr('秦晓东 <%s>' % from_addr)  # 发件人 不该就成为邮箱地址
+        msg['From'] = self.format_addr('黄义超 <%s>' % from_addr)  # 发件人 不该就成为邮箱地址
         msg['To'] = self.format_addr('收件人 <%s>' % self.to_addre)  # 收件人
         msg['Subject'] = Header('pdf解析的报告', 'utf-8').encode()  # 标题
 
@@ -430,20 +430,29 @@ def all_doc2pdf(path):
 
 
 def main():
-    all_files = r'\\dmp1\resource\pdf\港股其他 (月報表等)'
+    print('start')
+    # all_files = r'\\dmp1\resource\pdf\港股其他 (月報表等)'
+    all_files = r'\\vm-zdhjg64\resource\pdf\港股其他 (月報表等)'
     lls = []
+    dfp = pd.read_sql("select pdf_name from pdf_match", engine)
+    opdf = dfp['pdf_name'].values.tolist()
     for dirpath, dirnames, filenames in os.walk(all_files):
         for filename in filenames:
-            cc = dirpath + '\\'+filename
-            if cc[-4:] in ['.pdf', '.doc']:
-                lls.append(cc)
-
+            if filename in opdf:
+                pass
+            else:
+                cc = dirpath + '\\'+filename
+                if cc[-4:] in ['.pdf', '.doc']:
+                    lls.append(cc)
+    print('新的pdf有'+str(len(lls)))
     pdfaddress = os.getcwd() + '\\pdfs\\'
     if not os.path.isdir(pdfaddress):
         os.mkdir(pdfaddress)
 
     for ll in lls:
         shutil.copy(ll, pdfaddress)
+
+    print('开始解析word')
 
     """word转pdf"""
     all_doc2pdf(path=pdfaddress)
@@ -472,9 +481,9 @@ def main():
     """
     传入邮箱
     """
-    e = to_email('huangyc@hundsun.com')
-    # e = to_email('632207812@qq.com')
-    e.course()
+    if len(lls) > 0:
+        e = to_email('hkstock@gildata.com')
+        e.course()
 
 
 if __name__ == '__main__':
