@@ -10,6 +10,8 @@ import importlib
 import time
 importlib.reload(sys)
 import jieba
+from multiprocessing.dummy import Pool as ThreadPool
+from multiprocessing import Pool
 
 
 
@@ -73,9 +75,10 @@ class clean_pdf():
     def strtime(self, times):
         ll = []
         if type(times) is list:
-
             for publish_Time in times:
                 try:
+                    tt = publish_Time.find('日')
+                    publish_Time = publish_Time[0:tt + 1]
                     array = time.strptime(publish_Time, u"%Y年%m月%d日")
                     publishTime = time.strftime("%Y-%m-%d", array)
                     ll.append(publishTime)
@@ -87,6 +90,8 @@ class clean_pdf():
                 return None
         elif type(times) is str:
             try:
+                tt = times.find('日')
+                times = times[0:tt+1]
                 array = time.strptime(times, u"%Y年%m月%d日")
                 publishTime = time.strftime("%Y-%m-%d", array)
                 return publishTime
@@ -107,6 +112,20 @@ class clean_pdf():
             print('采集合集:', ll)
             # ll.sort(key=lambda i: len(i), reverse=True)
             return ll[0]
+        else:
+            return None
+
+    def rell(self, list, ss):
+        ll = []
+        for i in list:
+            a = self.clean(ss, "{}".format(i))
+            print(a)
+            if type(a) is str and len(a) >= 2:
+                ll.append(a)
+        if len(ll) >= 1:
+            print('采集合集:', ll)
+            # ll.sort(key=lambda i: len(i), reverse=True)
+            return ll
         else:
             return None
 
@@ -265,7 +284,7 @@ class clean_pdf():
                 '发行人简介',
                 '发行人基本情况',
                 '发行人基本信息',
-                '概览', '基本情况']
+                '概览', '基本情况', '公司简介']
 
         nm = ['注册号', '营业执照']
 
@@ -273,6 +292,7 @@ class clean_pdf():
                  '概览': '概览',
                  '公司基本情况': '公司基本情况',
                  '发行人简介': '发行人简介',
+                 '公司简介': '公司简介',
                  '基本情况':  '基本情况',
                  '发行人基本情况': '发行人基本情况',
                  '发行人基本信息': '发行人基本信息',
@@ -288,18 +308,20 @@ class clean_pdf():
                  '披露负责人': 'DSHMS',
                  '董事会秘书': 'DSHMS',
                  '联系电话': 'LXRDH',
-                 '电    话 ': 'LXRDH',
-                 '传    真': 'LXRCZ',
+                 '电话 ': 'LXRDH',
+                 '传真': 'LXRCZ',
                  '传真号码': 'LXRCZ',
                  '电子邮箱': 'LXRDZYJ',
                  '电子信箱': 'LXRDZYJ',
                  '证券事务代表': 'ZQSWDB',
                  '股证事物代表': 'ZQSWDB',
+                 '注册地址': '注册地址',
                  '公司住所': 'GSZCDZ',
                  '公司注册地址': 'GSZCDZ',
                  '通信地址': 'GSBGDZ',
                  '办公地址': 'GSBGDZ',
                  '联系地址': 'GSBGDZ',
+                 '住所': '住所',
                  '邮政编码': 'GSZCDZYB',
                  '经营范围': '经营范围',
                  '网址': 'GSWZ'}
@@ -331,7 +353,7 @@ class clean_pdf():
 
 
         """取坐标公司基本情况"""
-        size = 5
+        size = 12
         ps = []
         p1 = []
         for i in range(len(p)):
@@ -387,20 +409,24 @@ class clean_pdf():
         if len(n) >= 2:
             n1 = n[0][-1]
             top1 = n1 - 5
-            last1 = n1 + 15
+            last1 = n1 + 25
 
             n2 = n[1][-1]
             top2 = n2 - 5
-            last2 = n2 + 15
+            last2 = n2 + 25
 
             df1 = df.iloc[int(top1):int(last1), [1]]
             df2 = df.iloc[int(top2):int(last2), [1]]
 
             t1 = df1["A"].tolist()
             ss1 = strQ2B(''.join(t1))
+            if '...............' in ss1:
+                ss1 = ''
 
             t2 = df2["A"].tolist()
             ss2 = strQ2B(''.join(t2))
+            if '...............' in ss2:
+                ss2 = ''
             ss3 = ss1 + ss2
         elif len(n) == 1:
             n1 = n[0][-1]
@@ -434,7 +460,13 @@ class clean_pdf():
                  'GSWZ': ["网址(.+?)\\n", "互联网地址(.+?)\\n"]}
 
 
-        GSCLRQ = self.strtime(self.relist(serch.get('GSCLRQ'), ss3))
+        GSCLRQ = self.relist(serch.get('GSCLRQ'), ss3)
+        if type(GSCLRQ) is str and '年' in GSCLRQ:
+            GSCLRQ = self.strtime(GSCLRQ)
+
+        if GSCLRQ is None:
+            GSCLRQ = self.strtime(self.rell(serch.get('GSCLRQ'), ss3))
+
 
         try:
             if GSCLRQ is None:
@@ -444,64 +476,41 @@ class clean_pdf():
         except BaseException:
             pass
 
-        BGSLRQ = self.strtime(self.relist(serch.get('BGSLRQ'), ss3))
+        BGSLRQ = self.relist(serch.get('BGSLRQ'), ss3)
+        if BGSLRQ is not None and '年' in BGSLRQ:
+            BGSLRQ = self.strtime(BGSLRQ)
+
+        if BGSLRQ is None:
+            BGSLRQ = self.strtime(self.rell(serch.get('BGSLRQ'), ss3))
 
         SCZCDJDD = None
 
 
-        def get_wens(np, df, must, size=2):
-            ps = []
-            p1 = []
-            for i in range(len(np)):
-                if i == (len(np) - 1):
-                    p1.append(np[i])
-                    ps.append(p1)
-                else:
-                    if (np[i + 1] - np[i]) < size:
-                        p1.append(np[i])
-                    else:
-                        p1.append(np[i])
-                        new = p1.copy()
-                        ps.append(new)
-                        p1.clear()
-                # ps.sort(key=lambda i: len(i), reverse=True)
-                # lps = ps[:2]
-                # return lps
-            llls = []
-            for ls in ps:
-                ko = []
-                for i in ls:
-                    a = df.loc[i]["文映射"]
-                    if type(a) is list:
-                        for z in a:
-                            ko.append(z)
-                sum = list(set(ko))
-                llls.append(sum)
 
-            last = []
-            for i in range(len(ps)):
-                jj = llls[i]
-                num = ps[i][0]
-                # num2 = ps[i][-1]
-                print(num)
-                jj.append(num)
-                # jj.append(num2)
-                if len(jj) >= 2:
-                    last.append(jj)
-            last.sort(key=lambda i: len(i), reverse=True)
-            must_list = []
-            for ll in last:
-                for i in ll:
-                    if i == must:
-                        must_list.append(ll)
-                        break
-            return must_list[0]
 
 
 
 
         try:
+            ztime = []
             cltime = self.relist(serch.get('GSCLRQ'), ss3)
+            if '日' in cltime:
+                tt = cltime.find('日')
+                cltime = cltime[0:tt + 1]
+
+            ztime.append(cltime)
+
+            if type(cltime) is str and '年' not in cltime:
+                import datetime
+                d4 = datetime.datetime.strptime(cltime, '%Y-%m-%d')
+                d5 = d4.timetuple()
+                V = datetime.datetime.strftime(d4, "%Y{}%m{}%d{}").format('年', '月', '日')
+                Ver = str(d5.tm_year) + '{}' + str(d5.tm_mon) + '{}' + str(d5.tm_mday) + '{}'
+                cltime = Ver.format('年', '月', '日')
+                ztime.append(cltime)
+                ztime.append(V)
+
+
             nm.append(cltime)
 
             df["X"] = df["A"].apply(lambda x: zero2(x) if type(x) is str else 0)
@@ -512,28 +521,75 @@ class clean_pdf():
             wenmax = [int(i) for i in wenmax if i >= 2]
             df['Z'] = list(map(lambda x, y: x if y in wenmax else None, df['SUM'], df['Y']))
             np = list(set(df["Z"].tolist()))
-            np = [int(i) for i in np if type(i) is float and i > 0]
-            print(np)
 
-            T = get_wens(np, df, cltime)
+
+
+            def get_wens(np, df, must, size=2):
+
+                ps = []
+                p1 = []
+                for i in range(len(np)):
+                    if i == (len(np) - 1):
+                        p1.append(np[i])
+                        ps.append(p1)
+                    else:
+                        if (np[i + 1] - np[i]) < size:
+                            p1.append(np[i])
+                        else:
+                            p1.append(np[i])
+                            new = p1.copy()
+                            ps.append(new)
+                            p1.clear()
+                    # ps.sort(key=lambda i: len(i), reverse=True)
+                    # lps = ps[:2]
+                    # return lps
+                llls = []
+                for ls in ps:
+                    ko = []
+                    for i in ls:
+                        a = df.loc[i]["文映射"]
+                        if type(a) is list:
+                            for z in a:
+                                ko.append(z)
+                    sum = list(set(ko))
+                    llls.append(sum)
+
+                last = []
+                for i in range(len(ps)):
+                    jj = llls[i]
+                    num = ps[i][0]
+                    # num2 = ps[i][-1]
+                    print(num)
+                    jj.append(num)
+                    # jj.append(num2)
+                    if len(jj) >= 2:
+                        last.append(jj)
+                last.sort(key=lambda i: len(i), reverse=True)
+                must_list = []
+                for ll in last:
+                    for i in ll:
+                        if i in must:
+                            must_list.append(ll)
+                            break
+                return must_list[0]
+
+
+            np = [int(i) for i in np if type(i) is float and i > 0]
+            T = get_wens(np, df, ztime)
             dn = T[-1]
-            dl = dn + 8
+            dl = dn + 9
             df3 = df.iloc[int(dn):int(dl), [1]]
             ww = df3["A"].tolist()
-            # wt = []
-            # for w in ww:
-            #     wt.append(w)
-            #     if w[-2] == '。':
-            #         break
-
             wens = ''.join(ww)
             wen = re.sub('\n|\|', "", wens)
+
+
 
             if '营业执照' in wen:
                 x = re.search("{}(.+?)营业执照".format(cltime), wen).group(1)
                 nextx = re.search("{}(.+?)。".format(x[-10:]), wen).group(1)
-                wen = cltime + x + '营业执照' + nextx + '。'
-
+                # wen = cltime + x + '营业执照' + nextx + '。'
+                wen = cltime + x + nextx + '。'
                 seg_list = jieba.cut(x, cut_all=False)
                 a = list(seg_list)
                 jz = []
@@ -546,18 +602,18 @@ class clean_pdf():
                         jz.append(a[i])
                         j.append(a[i])
                 SCZCDJDD = ''.join(jz)
-            # demo = [r"{},[\u4e00-\u9fa5]+在(.+?局)办理完成".format(IGSDM_ZW),
-            #         r"{},[\u4e00-\u9fa5]+在(.+?)完成设立登记".format(IGSDM_ZW),
-            #         r"{},[\u4e00-\u9fa5]+在(.+?)注册登记".format(IGSDM_ZW),
-            #         r"{},[\u4e00-\u9fa5]+在(.+?分局)".format(IGSDM_ZW),
-            #         r"{},[\u4e00-\u9fa5]+在(.+?局)".format(IGSDM_ZW),
-            #         r"{},[\u4e00-\u9fa5]+取得了(.+?局)".format(IGSDM_ZW),
-            #         r"{},[\u4e00-\u9fa5]+从(.+?局)".format(IGSDM_ZW),
-            #         r"{},[\u4e00-\u9fa5]+取得了(.+?)核发的".format(IGSDM_ZW),
-            #         ]
-            # SCZCDJDD = self.relist(demo, wen)
         except BaseException:
             wen = None
+
+
+        # if wen is None:
+        #     yl = [i.start() for i in re.finditer('营业执照', all)]
+        #     chen = []
+        #     for y in yl:
+        #         # print(type(y))
+        #         w = all[y - 200:y + 200]
+        #         if cltime in w:
+        #             print('you')
 
 
         GSJK = wen
@@ -566,6 +622,8 @@ class clean_pdf():
 
         FRDB = self.relist(serch.get('FRDB'), ss3)
         DSHMS = self.relist(serch.get('DSHMS'), ss3)
+        if type(DSHMS) is str and len(DSHMS) > 4:
+            DSHMS = None
         LXRDH = self.relist(serch.get('LXRDH'), ss3)
         LXRCZ = self.relist(serch.get('LXRCZ'), ss3)
         LXRDZYJ = self.relist(serch.get('LXRDZYJ'), ss3)
@@ -640,6 +698,11 @@ class clean_pdf():
         dffff = pd.DataFrame([dict(filter(lambda x: x[1] not in [None, ''], dff.items()))])
         if 'FRDB' in dffff.columns:
             dffff['FRDB'] = dffff['FRDB'].apply(lambda x: x if type(x) is str and 4 >= len(x) >= 2 else None)
+        if 'GSCLRQ' in dffff.columns:
+            dffff['GSCLRQ'] = dffff['GSCLRQ'].apply(lambda x: x if type(x) is str and len(x) == 10 else None)
+        if 'BGSLRQ' in dffff.columns:
+            dffff['BGSLRQ'] = dffff['BGSLRQ'].apply(lambda x: x if type(x) is str and len(x) == 10 else None)
+
         return dffff
 
 
@@ -788,15 +851,18 @@ def to_sql(tb_name, conn, dataframe, type="update", chunksize=2000, debug=False)
 #     result = pool.map(clean_pdf.tool_to_db, sliced)
 
 
-path = 'C:\\Users\\qinxd\\Desktop\\to2\\12018-04-09 罗博特科智能科技股份有限公司创业板首次公开发行股票招股说明书（申报稿2018年3月29日报送）.pdf.xml'
+if __name__ == '__main__':
 
-clean_pdf.to_db(path)
+    path = 'C:\\Users\\qinxd\\Desktop\\to2\\12018-05-04 湖北五方光电股份有限公司首次公开发行股票招股说明书（申报稿2018年4月27日报送）.pdf.xml'
+    # path = 'C:\\Users\\qinxd\\Desktop\\to2\\12018-04-12 鞍山七彩化学股份有限公司创业板首次公开发行股票招股说明书（申报稿2018年3月30日报送）.pdf.xml'
+
+    clean_pdf.to_db(path)
 
 
 
 
 
 
-# df.to_csv(r'C:\Users\qinxd\Desktop\xml4.csv', encoding='utf_8_sig')
+# df.to_csv(r'C:\Users\qinxd\Desktop\xml1111.csv', encoding='utf_8_sig')
 
 
