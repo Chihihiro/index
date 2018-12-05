@@ -53,4 +53,10 @@ cv2.destroyAllWindows()
 
 
 
+def pdftoXml():
+    pdfpath = 'C:/Users/qinxd/Desktop/to/03898.pdf'
+    resultpath = 'C:/Users/qinxd/Desktop/to/03898.xml'
+    os.system('C:/Users/qinxd/Desktop/poppler-0.68.0/bin/pdftohtml.exe %s -i -xml %s' % (pdfpath,resultpath))
+
+
 
