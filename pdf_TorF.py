@@ -118,8 +118,12 @@ def sql_cols(df, usage="sql"):
             base += ", `%s`=VALUES(`%s`)" % (col, col)
         return base
 
+# engine = create_engine(
+#     "mysql+pymysql://{}:{}@{}:{}/{}".format('root', 'chihiro123', '47.107.35.189', 3306, 'mysql', ),
+#     connect_args={"charset": "utf8"}, echo=True, )
+
 engine = create_engine(
-    "mysql+pymysql://{}:{}@{}:{}/{}".format('root', 'chihiro123', '47.107.35.189', 3306, 'mysql', ),
+    "mysql+pymysql://{}:{}@{}:{}/{}".format('root', 'Chihiro123+', '10.3.2.25', 3306, 'base', ),
     connect_args={"charset": "utf8"}, echo=True, )
 
 def to_sql(tb_name, conn, dataframe, type="update", chunksize=2000, debug=False):
@@ -428,6 +432,21 @@ def all_doc2pdf(path):
         else:
             pass
 
+def len_pdf():
+    all_files = r'\\vm-zdhjg64\resource\pdf\港股其他 (月報表等)'
+    lls = []
+    dfp = pd.read_sql("select pdf_name from pdf_match", engine)
+    opdf = dfp['pdf_name'].values.tolist()
+    for dirpath, dirnames, filenames in os.walk(all_files):
+        for filename in filenames:
+            if filename in opdf:
+                pass
+            else:
+                cc = dirpath + '\\'+filename
+                if cc[-4:] in ['.pdf', '.doc']:
+                    lls.append(cc)
+    return lls
+
 
 def main():
     print('start')
@@ -455,8 +474,8 @@ def main():
     print('开始解析word')
 
     """word转pdf"""
-    all_doc2pdf(path=pdfaddress)
-    print('doc 转 pdf 成功')
+    # all_doc2pdf(path=pdfaddress)
+    # print('doc 转 pdf 成功')
     """
     迁移存放pdf文件，存放旧的csv文件
     """
@@ -472,18 +491,28 @@ def main():
     analysis()
     print('解析PDF成功')
 
-    strtime = now_time()
-    new_path = PATH + strtime + '\\'
-    if not os.path.isdir(new_path):
-        os.mkdir(new_path)
-    a = mv_file(pdfaddress, new_path, type_file='all')
-    a.move_files()
+
     """
     传入邮箱
     """
     if len(lls) > 0:
         e = to_email('hkstock@gildata.com')
         e.course()
+        e = to_email('632207812@qq.com')
+        e.course()
+
+    strtime = now_time()
+    new_path = PATH + strtime + '\\'
+    if not os.path.isdir(new_path):
+        os.mkdir(new_path)
+    try:
+        a = mv_file(pdfaddress, new_path, type_file='all')
+        a.move_files()
+    except BaseException:
+        pass
+
+
+
 
 
 if __name__ == '__main__':
