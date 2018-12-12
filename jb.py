@@ -68,26 +68,3 @@ def work():
 if __name__ == "__main__":
     work()
 
-# def work():
-#     time = now_num()
-#     num = len(E.len_pdf())
-#     print(num)
-#     if 22 > time >= 6 and num > 50:
-#         # E.main()
-#         print('开始任务')
-#         t = Timer(1*6, work)
-#         t.start()
-#     elif time == 23:
-#         if num == 0:
-#             t = Timer(1 * 6, work)
-#             t.start()
-#             pass
-#         else:
-#             # E.main()
-#             t = Timer(1*6, work)
-#             t.start()
-#     else:
-#         print("Hello World")
-#         t = Timer(1*6, work)
-#         t.start()
-

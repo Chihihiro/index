@@ -10,13 +10,21 @@ import subprocess
 import datetime
 import shutil
 import smtplib
+import logging
 from sqlalchemy import create_engine
 from win32com import client
 from email.header import Header
 from email.mime.text import MIMEText
 from email.utils import parseaddr, formataddr
 from email.mime.multipart import MIMEMultipart
+from xml.etree import ElementTree as ET
+from os.path import getsize
 
+
+def pdf_to_xml():
+    os.chdir("C:\\Users\\qinxd\\Desktop\\pp")
+    # """cd 到文件夹运行PDF转xml"""
+    subprocess.Popen(r'exec.bat -d "1 1"')
 
 
 class mv_file:
@@ -57,7 +65,6 @@ class mv_file:
             dstfile = self.new_path + '\\' + i
             shutil.copy(srcfile, dstfile)
             print("copy %s -> %s" % (srcfile, dstfile))
-
 
 
 class to_email:
@@ -118,13 +125,11 @@ def sql_cols(df, usage="sql"):
             base += ", `%s`=VALUES(`%s`)" % (col, col)
         return base
 
-# engine = create_engine(
-#     "mysql+pymysql://{}:{}@{}:{}/{}".format('root', 'chihiro123', '47.107.35.189', 3306, 'mysql', ),
-#     connect_args={"charset": "utf8"}, echo=True, )
 
 engine = create_engine(
     "mysql+pymysql://{}:{}@{}:{}/{}".format('root', 'Chihiro123+', '10.3.2.25', 3306, 'base', ),
     connect_args={"charset": "utf8"}, echo=True, )
+
 
 def to_sql(tb_name, conn, dataframe, type="update", chunksize=2000, debug=False):
     """
@@ -209,8 +214,6 @@ def to_sql(tb_name, conn, dataframe, type="update", chunksize=2000, debug=False)
         return sqls
 
 
-
-
 def now_time(a=0):
     now = datetime.datetime.now()
     delta = datetime.timedelta(days=a)
@@ -228,6 +231,8 @@ def now_time2(a=0):
     f = n_days.strftime('%Y%m%d%H%M')
     return f
 
+logname = now_time2()
+
 
 def strQ2B(ustring):
     """全角转半角"""
@@ -241,118 +246,6 @@ def strQ2B(ustring):
 
         rstring = rstring + chr(inside_code)
     return rstring
-
-
-def one_page(path, pa):
-    try:
-        df1 = tabula.read_pdf(path, encoding='utf-8', pages=[pa], lattice=bool)
-        if df1.index.values[0] == 0:
-            pass
-        else:
-            cc = df1.columns[0]
-            t = df1.reset_index(drop=False)['index']
-            d = pd.DataFrame(t)
-
-            d.columns = [cc]
-            df1 = d
-
-    except subprocess.CalledProcessError:
-        print('超过页数')
-        d = {"A": '增加/(減少)超过页数本月底结存'}
-        df1 = pd.DataFrame([d])
-
-    except BaseException as e:
-        print(e, '无法解析')
-        d = {"A": '增加/(減少)无法解析请手动查看本月底结存'}
-        df1 = pd.DataFrame([d])
-    return df1
-
-
-def read_3_page(path, pa):
-    df1 = one_page(path, pa)
-    df1[df1.columns[0]] = df1[df1.columns[0]].apply(lambda x: str(x) if type(x) is int else x)
-
-    if type(df1) is pd.DataFrame:
-        conum = len(df1.columns)
-        if 10 > conum > 1:
-            print('有两列数据')
-
-            # path = 'C:/Users/qinxd/Desktop/00547-數字王國-月報表截至2018年9月30日止月份之股份發行人的證券變動月報表 (218KB, PDF).pdf'
-            co1 = pd.DataFrame([df1.columns[0]], columns=['A'])
-            # re.sub('\r0|\r| | |　｜　｜', "", s)
-            li = [chr(i) for i in range(ord("A"), ord("Z") + 1)]
-            df1.columns = [li[i] for i in range(len(df1.columns))]
-            Adf = pd.DataFrame(df1['A'])
-            dff = Adf.append(co1).reset_index(drop=True)
-            return dff
-        else:
-            co1 = pd.DataFrame([df1.columns[0]], columns=['A'])
-            df1.columns = ['A']
-            dff = df1.append(co1).reset_index(drop=True)
-            return dff
-    else:
-        print('为图片')
-        d = {"A": '增加/(減少)解析为图片请查看本月底结存'}
-        dff = pd.DataFrame([d])
-        return dff
-
-
-def clean_txt(x):
-    try:
-        num = re.sub(",|\(減少\)|\(\)", "", re.search('增加/(.+?)本月底.存', x).group(1))
-    except AttributeError:
-        num = ''
-    else:
-        pass
-    return num
-
-
-def only_num(x):
-    try:
-        txt = re.findall('[0-9]*', re.sub(",", "", x))
-        num = max([float(x) for x in txt if x != ''])
-    except ValueError:
-        return
-    return num
-
-
-def read_pdf_all(path):
-    # df1 = read_3_page(path, 1)
-    # df2 = read_3_page(path, 2)
-    # df3 = read_3_page(path, 3)
-    dfs = []
-    for i in range(1, 4):
-        try:
-            t = read_3_page(path, i)
-            dfs.append(t)
-        except BaseException:
-            d = {"A": '增加/(減少)无法解析请手动查看本月底结存'}
-            t = pd.DataFrame([d])
-            dfs.append(t)
-        else:
-            pass
-
-    # df = df1.append([df2, df3]).reset_index(drop=True)
-    df = dfs[0].append([dfs[1], dfs[2]]).reset_index(drop=True)
-    dff = df.dropna(axis=0).reset_index(drop=True)
-    dff['A'] = dff['A'].apply(lambda x: strQ2B(x) if type(x) is str else x)
-    dff["B"] = dff['A'].apply(lambda x: x.split())
-    dff['txt'] = dff['B'].apply(lambda x: "".join(x))
-    dff['clean'] = dff['txt'].apply(lambda x: clean_txt(x))
-    dff['包含的数字'] = dff['clean'].apply(lambda x: only_num(x))
-    dff['特殊'] = dff['clean'].apply(lambda x: 11 if type(x) is str and '增加減少' in x else 0)
-    y = "".join(dff['clean'].values.tolist())
-
-    if y == '':
-        y = '解析为空请查看一下'
-
-    su = dff['包含的数字'].sum() + dff['特殊'].sum()
-    if su > 10:
-        a = '有数据请查看'
-        return [a, y]
-    else:
-        a = '无'
-        return [a, y]
 
 
 def doc2pdf(doc_name, pdf_name):
@@ -370,45 +263,8 @@ def doc2pdf(doc_name, pdf_name):
         worddoc.Close()
         return pdf_name
     except:
+        # worddoc.Close()
         return 1
-
-
-def analysis():
-    """
-
-    :path: 读取文件夹的路径
-    """
-    p = os.getcwd()
-    pp = p + '\\pdfs\\'
-    files = os.listdir(pp)
-    """
-    读取数据库里面已经解析的pdf
-    """
-    df = pd.read_sql("select pdf_name from pdf_match", engine)
-    pl = df['pdf_name'].values.tolist()
-    ma = [i for i in files if i not in pl]
-    data = pd.DataFrame(ma, columns=['pdf_name'])
-    to_sql('pdf_match', engine, data, type='update')
-    pdfs = []
-
-    for i in ma:
-        if '.pdf' in i:
-            pdfs.append(i)
-        else:
-            pass
-
-    result = []
-    for pdf in pdfs:
-        readp = pp + pdf
-        print(pdf)
-        w = read_pdf_all(readp)
-        f = [pdf, w[0], w[1]]
-        result.append(f)
-
-    dataframe = pd.DataFrame(result, columns=['PDF名字', '解析结果', '内容和状况'])
-    dataframe['解析不出的'] = dataframe['内容和状况'].apply(lambda x: '解析失败,或者有图片' if '解析' in x else 'pass')
-    now = '\\' + now_time2() + '.csv'
-    dataframe.to_csv(p + now, encoding='utf_8_sig')
 
 
 def all_doc2pdf(path):
@@ -430,8 +286,8 @@ def all_doc2pdf(path):
         else:
             pass
 
-def len_pdf():
-    all_files = r'\\vm-zdhjg64\resource\pdf\港股其他 (月報表等)'
+
+def len_pdf(all_files=r'\\vm-zdhjg64\resource\pdf\港股其他 (月報表等)'):
     lls = []
     dfp = pd.read_sql("select pdf_name from pdf_match", engine)
     opdf = dfp['pdf_name'].values.tolist()
@@ -440,14 +296,223 @@ def len_pdf():
             if filename in opdf:
                 pass
             else:
-                cc = dirpath + '\\'+filename
+                cc = dirpath + '\\' + filename
                 if cc[-4:] in ['.pdf', '.doc']:
                     lls.append(cc)
     return lls
 
 
-def main():
+def read_xml(path):
+    print(path)
+    tree = ET.parse(path)
+    root = tree.getroot()
+    # root = ET.fromstring(country_data_as_string) #通过字符串导入,直接获取根
+    childs = root.getchildren()
+    console_out(type='debug', error="开始解析：" + os.path.basename(path)[4:-4])
+    books = []
+    # all = ""
+    for child0 in childs:
+        # book = {}
+        for child00 in child0.getchildren():
+            # print child00.tag #标签名，即name、date、price、description
+            # print child00.text
+            bb = child00.text
+            books.append("喵厸" + re.sub("s/|\|", "甲鸭", strQ2B(bb)) + "喵厸")
+            # all += re.sub("", "", strQ2B(bb))
+
+            # for p in child00:
+            #     t = p.text
+            #     books.append("\n" + t + "\n")
+            #     all += "\n" + t + "\n"
+
+    return books
+
+
+
+def clean(txt, zhenze):
+    try:
+        num = re.sub("", "", re.search(zhenze, txt).group(1))
+    except BaseException:
+        num = ''
+    else:
+        pass
+    return num
+
+
+def relist(list, ss):
+    ll = []
+    for i in list:
+        a = clean(ss, "{}".format(i))
+        print(a)
+        if type(a) is str and len(a) >= 1:
+            ll.append(a)
+    if len(ll) >= 1:
+        print('采集合集:', ll)
+        # ll.sort(key=lambda i: len(i), reverse=True)
+        return ll[0]
+    else:
+        return None
+
+
+def getdirsize(name):
+    size = getsize(name)
+    print(size)  # 输出文件的大小
+    return size
+
+
+def only_num(x):
+    try:
+        t = re.sub(",", "", x)
+        print(t)
+        txt = re.findall('[0-9]+', t)
+        print(txt)
+        num = [float(x) for x in txt if x != '']
+    except BaseException:
+        return None
+    return num
+
+
+def process(all_files):
+    vlist = []
+
+    lls = []
+    # all_files = r'C:\Users\qinxd\Desktop\pp'
+    for dirpath, dirnames, filenames in os.walk(all_files):
+        for filename in filenames:
+            cc = dirpath + '\\' + filename
+            if cc[-4:] in ['.xml']:
+                lls.append(cc)
+
+    for path in lls:
+
+        name = os.path.basename(path)
+        try:
+            size = getdirsize(path)
+
+            if size < 2000:
+                psize = '文件可能是图片需要查看'
+                v = None
+                vlist.append([name, v, psize])
+            else:
+                psize = 'pass'
+                Z1 = read_xml(path)
+                df = pd.DataFrame(Z1)
+                v = ['上月底結存', '本月增加/(減少)', '增加/(減少)', '本月底結存', '本月增加', '增加/(減少)', '本月優先股增加']
+
+                df = df.reset_index(level=0)
+                df.columns = ["SUM", "A"]
+
+                def zero(strs):
+                    s = 0
+                    for i in v:
+                        if i in strs:
+                            s += 1
+                    return s
+
+                df["B"] = df["A"].apply(lambda x: zero(x) if type(x) is str else 0)
+                df["C"] = (df["B"].shift(1) + df["B"].shift(-1) + df["B"])
+                llmax = list(set(df["C"].tolist()))
+                llmax = [int(i) for i in llmax if i >= 2]
+                df['D'] = list(map(lambda x, y: x if y in llmax else None, df['SUM'], df['C']))
+                p = list(set(df["D"].tolist()))
+                p = [int(i) for i in p if type(i) is float and i > 2]
+
+                """取坐标公司基本情况"""
+                size = 2
+                ps = []
+                p1 = []
+                for i in range(len(p)):
+                    if i == (len(p) - 1):
+                        p1.append(p[i])
+                        ps.append(p1)
+                    else:
+                        if (p[i + 1] - p[i]) < size:
+                            p1.append(p[i])
+                        else:
+                            p1.append(p[i])
+                            new = p1.copy()
+                            ps.append(new)
+                            p1.clear()
+
+                maxandmin = [[min(i), max(i)] for i in ps]
+
+                wen = []
+                for i in range(len(maxandmin)):
+                    df1 = df.iloc[maxandmin[i][0]:maxandmin[i][1], [1]]
+                    t1 = df1["A"].tolist()
+                    wen1 = ''.join(t1)
+                    wen.append(wen1)
+
+                ff = ["本月增加/\(減少\)(.+?)本月底結存", "本月增加/\(減少\)(.+?)喵厸",
+                      "增加/\(減少\)(.+?)本月底", "增加/\(減少\)(.+?)喵厸", "增加/\(減少\)(.+?)本月優先股增加"]
+                caowen = []
+                for txt in wen:
+                    # print(txt)
+                    # s = clean(txt,"本月增加(.+?)本月底結存")
+                    w = relist(ff, txt)
+                    caowen.append(w)
+
+                nums = []
+                for i in caowen:
+                    nb = only_num(i)
+                    if type(nb) is list:
+                        for yy in nb:
+                            nums.append(yy)
+
+                nums = list(set(nums))
+                v = [str(i) for i in nums if i > 100]
+
+                wnums = ",".join(v)
+
+                if len(wnums) >= 1:
+                    psize = '有数据请查看'
+
+                if wnums == []:
+                    wnums = None
+
+                name = os.path.basename(path)
+                vlist.append([name, wnums, psize])
+        except AttributeError:
+            print('文件打开失败')
+            console_out(type='error', error='文件无法解析请手动查看')
+            vlist.append([name, None, '无法解析请手动查看'])
+    return vlist
+
+def console_out(type, error):
+    ''''' Output log to file and console '''
+    # Define a Handler and set a format which output to file
+    logging.basicConfig(
+        level=logging.DEBUG,  # 定义输出到文件的log级别，大于此级别的都被输出
+        format='%(asctime)s  %(filename)s : %(levelname)s  %(message)s',  # 定义输出log的格式
+        datefmt='%Y-%m-%d %A %H:%M:%S',  # 时间
+        filename=os.getcwd() + '\\log\\{}.log'.format(logname),  # log文件名
+        filemode='w')  # 写入模式“w”或“a”
+    # Define a Handler and set a format which output to console
+    console = logging.StreamHandler()  # 定义console handler
+    console.setLevel(logging.INFO)  # 定义该handler级别
+    formatter = logging.Formatter('%(asctime)s  %(filename)s : %(levelname)s  %(message)s')  # 定义该handler格式
+    console.setFormatter(formatter)
+    # Create an instance
+    logging.getLogger().addHandler(console)  # 实例化添加handler
+    # Print information              # 输出日志级别
+    if type == 'debug':
+        logging.debug('logger debug message: %s' % error)
+    if type == 'message':
+        logging.info('logger info message: %s' % error)
+    if type == 'warning':
+        logging.warning('logger warning message: %s' % error)
+    if type == 'error':
+        logging.error('logger error message: %s' % error)
+    if type == 'critical':
+        logging.critical('logger critical message: %s' % error)
+
+def course():
     print('start')
+    selfpath = os.getcwd()
+    os.chdir(selfpath + "\\1start\\xml")
+    # """cd 到文件夹运行PDF转xml"""
+    subprocess.Popen(r'exec.bat -d "pdfs pdfs"')
+    os.chdir(selfpath)
     # all_files = r'\\dmp1\resource\pdf\港股其他 (月報表等)'
     all_files = r'\\vm-zdhjg64\resource\pdf\港股其他 (月報表等)'
     lls = []
@@ -458,46 +523,69 @@ def main():
             if filename in opdf:
                 pass
             else:
-                cc = dirpath + '\\'+filename
+                cc = dirpath + '\\' + filename
                 if cc[-4:] in ['.pdf', '.doc']:
                     lls.append(cc)
-    print('新的pdf有'+str(len(lls)))
-    pdfaddress = os.getcwd() + '\\pdfs\\'
-    if not os.path.isdir(pdfaddress):
-        os.mkdir(pdfaddress)
+    print('新的pdf有' + str(len(lls)))
+    pdfaddress = os.getcwd() + '\\1start\\xml\\pdfs\\'
+    # if not os.path.isdir(pdfaddress):
+        # os.mkdir(pdfaddress)
 
     for ll in lls:
-        shutil.copy(ll, pdfaddress)
+        shutil.copy(ll, pdfaddress)  # 复制文件到1star/xml/pdfs
 
     print('开始解析word')
 
     """word转pdf"""
-    # all_doc2pdf(path=pdfaddress)
-    # print('doc 转 pdf 成功')
+    all_doc2pdf(path=pdfaddress)
+    print('doc 转 pdf 成功')
     """
     迁移存放pdf文件，存放旧的csv文件
     """
     base_path = os.getcwd()
     PATH = os.getcwd() + '\\被解析过的pdfs\\'
-    if not os.path.isdir(PATH):
-        os.mkdir(PATH)
+    # if not os.path.isdir(PATH):
+        # os.mkdir(PATH)
     csv_path = os.getcwd() + '\\存放旧csv\\'
-    if not os.path.isdir(csv_path):
-        os.mkdir(csv_path)
+    # if not os.path.isdir(csv_path):
+    #     os.mkdir(csv_path)
     csv = mv_file(base_path + '\\', csv_path, type_file='.csv')
     csv.move_files()
-    analysis()
-    print('解析PDF成功')
+    """上面是迁移csv"""
 
+    # analysis()
+
+    """pdf信息入库"""
+    pp = selfpath + '\\1start\\xml\\pdfs\\'
+    files = os.listdir(pp)
+    files = [i for i in files if i[-4:] == '.pdf']
+    """
+    读取数据库里面已经解析的pdf
+    """
+    df_pdfs = pd.read_sql("select pdf_name from pdf_match", engine)
+    pl = df_pdfs['pdf_name'].values.tolist()
+    ma = [i for i in files if i not in pl]
+    data = pd.DataFrame(ma, columns=['pdf_name'])
+    data['pdf_name'] = data['pdf_name'].apply(lambda x: x[4:-4])
+
+
+    rpath = selfpath + '\\1start\\xml'
+    result = process(rpath)
+    dataframe = pd.DataFrame(result, columns=['文件名字' '解析结果', '解析状况'])
+    now = '\\' + now_time2() + '.csv'
+    dataframe.to_csv(selfpath + now, encoding='utf_8_sig')
+    print('解析PDF成功')
 
     """
     传入邮箱
     """
     if len(lls) > 0:
-        e = to_email('hkstock@gildata.com')
-        e.course()
+        # e = to_email('hkstock@gildata.com')
+        # e.course()
         e1 = to_email('632207812@qq.com')
         e1.course()
+
+    # to_sql('pdf_match', engine, data, type='update')#解析成功发送email成功然后入库
 
     strtime = now_time()
     new_path = PATH + strtime + '\\'
@@ -506,18 +594,17 @@ def main():
     try:
         a = mv_file(pdfaddress, new_path, type_file='all')
         a.move_files()
-    except BaseException:
-        pass
+    except BaseException as e:
+        console_out(type='error', error=e)
+
+def main():
+    try:
+        main()
+    except BaseException as e:
+        console_out(type='error', error=e)
 
 
 
-
-
-if __name__ == '__main__':
-    main()
-
-
-
-
-
+# if __name__ == '__main__':
+#     main()
 

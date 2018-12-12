@@ -29,3 +29,34 @@ if __name__ == '__main__':
     # ftp_name = "f:/test.pdf"
     doc2pdf(doc_name, ftp_name)
 
+import win32com.client
+
+
+def check_exsit(process_name):
+    WMI = win32com.client.GetObject('winmgmts:')
+    processCodeCov = WMI.ExecQuery('select * from Win32_Process where Name="%s"' % process_name)
+    if len(processCodeCov) > 0:
+        return 1
+    else:
+        return 0
+
+
+if __name__ == '__main__':
+    check_exsit('java.exe')
+
+import time
+times = 20
+
+nb = 0
+for i, e in enumerate(range(times)):
+    print(i)
+    nn = check_exsit('java.exe')
+    time.sleep(5)
+    nb += 5
+    if nb == 10+times:
+        print('超过时间直接解析')
+        break
+    if nn < 1:
+        print('解析完成')
+        break
+
