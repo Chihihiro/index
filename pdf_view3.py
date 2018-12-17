@@ -21,9 +21,6 @@ from os.path import getsize
 from threading import Timer
 import win32com.client
 
-
-
-
 engine = create_engine(
     "mysql+pymysql://{}:{}@{}:{}/{}".format('root', 'Chihiro123+', '10.3.2.25', 3306, 'base', ),
     connect_args={"charset": "utf8"}, echo=True, )
@@ -117,6 +114,11 @@ class to_email:
 
 
 def check_exsit(process_name):
+    """
+    关闭指定进程
+    :param process_name:  xxx.exe
+    :return:
+    """
     WMI = win32com.client.GetObject('winmgmts:')
     processCodeCov = WMI.ExecQuery('select * from Win32_Process where Name="%s"' % process_name)
     if len(processCodeCov) > 0:
@@ -272,6 +274,10 @@ def doc2pdf(doc_name, pdf_name):
         worddoc = word.Documents.Open(doc_name, ReadOnly=1)
         worddoc.SaveAs(pdf_name, FileFormat=17)
         worddoc.Close()
+        # worddoc.quit()
+        word.Close()
+        word.quit()
+        os.system('taskkill /f /im WINWORD.EXE')
         return pdf_name
     except:
         # worddoc.Close()
@@ -388,7 +394,6 @@ class pdf_analysis:
             except BaseException:
                 return None
             return num
-
 
     def process(self, all_files):
         vlist = []
@@ -541,11 +546,8 @@ class pdf_analysis:
                     if cc[-4:] in ['.pdf', '.doc']:
                         lls.append(cc)
         print('新的pdf有' + str(len(lls)))
-        # lls = lls[:100]
         if len(lls) > 0:
             pdfaddress = self.self_path + '\\1start\\xml\\pdfs\\'
-            # if not os.path.isdir(pdfaddress):
-            # os.mkdir(pdfaddress)
 
             for ll in lls:
                 shutil.copy(ll, pdfaddress)  # 复制文件到1star/xml/pdfs
@@ -553,24 +555,20 @@ class pdf_analysis:
             print('开始解析word')
 
             """word转pdf"""
-            # all_doc2pdf(path=pdfaddress)
+            all_doc2pdf(path=pdfaddress)
             print('doc 转 pdf 成功')
-            """
-            迁移存放pdf文件，存放旧的csv文件
-            """
+
             os.chdir(self.xml_path)
             # """cd 到文件夹运行PDF转xml"""
             subprocess.Popen(r'exec.bat -d "pdfs pdfs"')
-            time.sleep(10+len(lls)/10)
+            time.sleep(10 + len(lls) / 10)
             """等待pdf转xml解析结束"""
             os.chdir(self.self_path)
 
-            PATH = self.self_path + '\\被解析过的pdfs\\'
-            # if not os.path.isdir(PATH):
-            # os.mkdir(PATH)
+            """
+            迁移存放pdf文件，存放旧的csv文件↓
+            """
             csv_path = self.self_path + '\\存放旧csv\\'
-            # if not os.path.isdir(csv_path):
-            #     os.mkdir(csv_path)
             csv = mv_file(self.self_path + '\\', csv_path, type_file='.csv')
             csv.move_files()
             """上面是迁移csv"""
@@ -585,9 +583,7 @@ class pdf_analysis:
             ma = [i for i in files if i not in pl]
             data = pd.DataFrame(ma, columns=['pdf_name'])
 
-
             """需要等待xml解析完成"""
-
             nbtime = 0
             for i, e in enumerate(range(len(lls))):
                 print(i)
@@ -615,20 +611,16 @@ class pdf_analysis:
             传入邮箱
             """
             if len(lls) > 0:
-                # e = to_email('hkstock@gildata.com')
-                # e.course()
-                e1 = to_email('632207812@qq.com')
-                e1.course()
+                e = to_email('hkstock@gildata.com')
+                e.course()
+                # e1 = to_email('632207812@qq.com')
+                # e1.course()
 
-            to_sql('pdf_match', engine, data, type='update')#解析成功发送email成功然后入库
+            to_sql('pdf_match', engine, data, type='update')  # 解析成功发送email成功然后入库
 
-            strtime = now_time()
-            new_path = PATH + strtime + '\\'
-            if not os.path.isdir(new_path):
-                os.mkdir(new_path)
             try:
-                a = mv_file(pdfaddress, new_path, type_file='all')
-                a.move_files()
+                a = mv_file(pdfaddress, pdfaddress, type_file='all')
+                a.del_files()
             except BaseException as e:
                 self.console_out(type='error', error=e)
             dd = mv_file(old_path=self.xml_path,
@@ -647,50 +639,58 @@ class pdf_analysis:
         return g
 
 
-
-
 if __name__ == '__main__':
+    """取消注释运行解析"""
     work = pdf_analysis()
     work.main()
 
-# def main():
-#     work = pdf_analysis()
-#     work.main()
-#
-#
-# def now_num(a=0):
-#     now = datetime.datetime.now()
-#     delta = datetime.timedelta(minutes=a)
-#     n_days = now + delta
-#     print(n_days.strftime('%Y-%m-%d %H:%M:%S'))
-#     f = n_days.strftime('%H')
-#     i = int(f)
-#     return i
-#
-#
-# def work():
-#     time = now_num()
-#     num = len(len_pdf())
-#     print(num)
-#     if 22 > time >= 6 and num > 50:
-#         main()
-#         print('开始任务')
-#         t = Timer(1*60*60, work)
-#         t.start()
-#     elif time == 23:
-#         if num == 0:
-#             t = Timer(1 * 60 * 60, work)
-#             t.start()
-#             pass
-#         else:
-#             main()
-#             t = Timer(1*60*60, work)
-#             t.start()
-#     else:
-#         print("数量不够不解析")
-#         t = Timer(1*60*60, work)
-#         t.start()
-#
-#
-# if __name__ == "__main__":
-#     work()
+"""上面程序主体下面是定时任务"""
+
+
+def main():
+    work = pdf_analysis()
+    work.main()
+
+
+def now_num(a=0):
+    now = datetime.datetime.now()
+    delta = datetime.timedelta(minutes=a)
+    n_days = now + delta
+    print(n_days.strftime('%Y-%m-%d %H:%M:%S'))
+    f = n_days.strftime('%H')
+    i = int(f)
+    return i
+
+
+def work():
+    """定时任务每小时解析一次"""
+    time = now_num()
+    num = len(len_pdf())
+    print(num)
+    if 22 > time >= 6 and num > 50:
+        main()
+        print('开始任务')
+        t = Timer(1 * 60 * 60, work)
+        t.start()
+    elif time == 23:
+        # if num == 0:
+        #     t = Timer(1 * 60 * 60, work)
+        #     t.start()
+        #     pass
+        # else:
+        #     main()
+        #     t = Timer(1*60*60, work)
+        #     t.start()
+        if num == 23:
+            pass
+        else:
+            main()
+
+    else:
+        print("数量不够不解析")
+        t = Timer(1 * 60 * 60, work)
+        t.start()
+
+
+if __name__ == "__main__":
+    work()
